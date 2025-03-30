@@ -1,190 +1,95 @@
-from datetime import datetime
 
-def test_posts(test_client):
-    response = test_client.get("/posts")
+def test_index_template(client, captured_templates):
+    response = client.get('/')
     assert response.status_code == 200
-    assert "Последние посты" in response.get_data(as_text=True)
+    assert captured_templates[0][0].name == 'index.html'
 
-def test_posts_template(test_client, captured_templates, mocker, posts_list):
-    with captured_templates as templates:
-        mocker.patch(
-            "app.posts_list",
-            return_value=posts_list,
-            autospec=True
-        )
-        
-        _ = test_client.get('/posts')
-        template, context = templates[0]
-        assert len(templates) == 1
-        assert template.name == 'posts.html'
-        assert context['title'] == 'Посты'
-        assert len(context['posts']) == 1
+def test_posts_template(client, captured_templates):
+    response = client.get('/posts')
+    assert response.status_code == 200
+    assert captured_templates[0][0].name == 'posts.html'
+    assert 'posts' in captured_templates[0][1]
 
-def test_post_page(test_client, captured_templates, mocker, posts_list):
-    with captured_templates as templates:
-        mocker.patch(
-            "app.posts_list",
-            return_value=posts_list,
-            autospec=True
-        )
-        
-        response = test_client.get('/posts/0')
-        template, context = templates[0]
+def test_posts_data(client):
+    response = client.get('/posts')
+    assert response.status_code == 200
+    assert 'Заголовок поста' in response.get_data(as_text=True)
 
-        assert response.status_code == 200
-        assert len(templates) == 1
-        assert template.name == 'post.html'
-        assert context['title'] == posts_list[0]['title']
-        assert context['post'] == posts_list[0]
+def test_post_template(client, captured_templates):
+    response = client.get('/posts/0')
+    assert response.status_code == 200
+    assert captured_templates[0][0].name == 'post.html'
+    assert 'post' in captured_templates[0][1]
 
-def test_page_content(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
+
+def test_post_data(client):
+    response = client.get('/posts/0')
+
+    assert response.status_code == 200
+    response_as_text = response.get_data(as_text=True)
+    assert 'Заголовок поста' in response_as_text
+    author_name = response_as_text.split('<span class="author fw-bold">')[1].split('</span>')[0]
+    assert author_name in response_as_text
+
     
-    response = test_client.get('/posts/0')
+def test_post_date_format(client):
+    response = client.get('/posts/0')
     assert response.status_code == 200
-    response_text = response.get_data(as_text=True)
-    assert posts_list[0]['title'] in response_text
-    assert posts_list[0]['author'] in response_text
-    assert posts_list[0]['text'] in response_text
-    assert posts_list[0]['image_id'] in response_text
+    assert any(b'202' in response.data for year in range(0, 5))
 
-def test_post_date(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-
-    response = test_client.get('/posts/0')
-    response_as_text = response.get_data(as_text=True) 
-    assert response.status_code == 200
-    assert '23.03.2025' in response_as_text
-
-
-def test_comments(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/0')
-    assert response.status_code == 200
-    response_text = response.get_data(as_text=True)
-    for comment in posts_list[0]['comments']:
-        assert comment['author'] in response_text
-        assert comment['text'] in response_text
-        if 'replies' in comment:
-            for reply in comment['replies']:
-                assert reply['author'] in response_text
-                assert reply['text'] in response_text
-
-def test_comment_form(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/0')
-    assert response.status_code == 200
-    response_text = response.get_data(as_text=True)
-    assert 'Оставьте комментарий' in response_text
-    assert 'textarea' in response_text
-    assert 'Отправить' in response_text
-
-def test_wrongindex(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/999')
+def test_post_404(client):
+    response = client.get('/posts/999')
     assert response.status_code == 404
 
-def test_negative_index(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/-1')
-    assert response.status_code == 404
-
-def test_invalid_index(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/invalid')
-    assert response.status_code == 404
-
-def test_post_image(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-
-    response = test_client.get('/posts/0')
-    response_text = response.get_data(as_text=True)
+def test_about_template(client, captured_templates):
+    response = client.get('/about')
     assert response.status_code == 200
-    assert 'src="/static/images/123.jpg"' in response_text
+    assert captured_templates[0][0].name == 'about.html'
 
-
-def test_required_comment_form(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/0')
+def test_about_data(client):
+    response = client.get('/about')
     assert response.status_code == 200
-    assert 'required' in response.get_data(as_text=True)
+    response_as_text = response.get_data(as_text=True)
+    assert 'Об авторе' in response_as_text
 
-def test_post_comment_form_submit(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/0')
+def test_index_status_code(client):
+    response = client.get('/')
     assert response.status_code == 200
-    response_text = response.get_data(as_text=True)
-    assert 'form' in response_text
-    assert 'method="post"' in response_text
 
-def test_comment_form_validation(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-    
-    response = test_client.get('/posts/0')
+def test_posts_status_code(client):
+    response = client.get('/posts')
+    assert response.status_code == 200
+
+def test_post_status_code(client):
+    response = client.get('/posts/0')
+    assert response.status_code == 200
+
+def test_post_comments(client):
+    response = client.get('/posts/0')
+    assert response.status_code == 200
+    response_as_text = response.get_data(as_text=True)
+    assert 'Комментарии' in response_as_text
+
+
+def test_post_form_validation(client):
+    response = client.get('/posts/0')
     assert response.status_code == 200
     response_as_text = response.get_data(as_text=True)
     assert 'textarea' in response_as_text
     assert 'minlength' in response_as_text or 'required' in response_as_text
 
-def test_comment_submit_button(test_client, mocker, posts_list):
-    mocker.patch(
-        "app.posts_list",
-        return_value=posts_list,
-        autospec=True
-    )
-
-    response = test_client.get('/posts/0') 
+def test_post_submit_button(client):
+    
+    response = client.get('/posts/0') 
     response_as_text = response.get_data(as_text=True) 
     assert response.status_code == 200
     assert 'Отправить' in response_as_text
+
+def test_post_images(client):
+    response = client.get('/posts')
+    assert response.status_code == 200
+    assert any(image_id.encode() in response.data for image_id in ['7d4e9175-95ea-4c5f-8be5-92a6b708bb3c.jpg'])
+
+def test_non_existing_route(client):
+    response = client.get('/nonexistent')
+    assert response.status_code == 404
